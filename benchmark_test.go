@@ -15,7 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Benchmarks", func() {
+var _ = FDescribe("Benchmarks", func() {
 	dataLen := 50 /* MB */ * (1 << 20)
 	data := make([]byte, dataLen)
 
@@ -26,7 +26,9 @@ var _ = Describe("Benchmarks", func() {
 
 		Context(fmt.Sprintf("with version %d", version), func() {
 			Measure("transferring a file", func(b Benchmarker) {
+				start := time.Now()
 				rand.Read(data) // no need to check for an error. math.Rand.Read never errors
+				fmt.Println("Reading rand: ", time.Now().Sub(start))
 
 				var ln Listener
 
@@ -49,12 +51,15 @@ var _ = Describe("Benchmarks", func() {
 				}()
 
 				// start the client
+				start = time.Now()
 				addr := <-serverAddr
 				sess, err := DialAddr(addr.String(), &tls.Config{InsecureSkipVerify: true}, nil)
 				Expect(err).ToNot(HaveOccurred())
 				str, err := sess.AcceptStream()
 				Expect(err).ToNot(HaveOccurred())
+				fmt.Println("Dialing: ", time.Now().Sub(start))
 
+				start = time.Now()
 				buf := &bytes.Buffer{}
 				// measure the time it takes to download the dataLen bytes
 				// note we're measuring the time for the transfer, i.e. excluding the handshake
@@ -69,6 +74,7 @@ var _ = Describe("Benchmarks", func() {
 
 				ln.Close()
 				sess.Close(nil)
+				fmt.Println("Transfer: ", time.Now().Sub(start))
 			}, 6)
 		})
 	}
