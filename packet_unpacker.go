@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lucas-clemente/quic-go/frames"
+	"github.com/lucas-clemente/quic-go/internal/utils"
 	"github.com/lucas-clemente/quic-go/protocol"
 	"github.com/lucas-clemente/quic-go/qerr"
 )
@@ -44,12 +45,13 @@ func (u *packetUnpacker) Unpack(publicHeaderBinary []byte, hdr *PublicHeader, da
 	for r.Len() > 0 {
 		typeByte, _ := r.ReadByte()
 		if typeByte == 0x0 { // PADDING frame
+			utils.Debugf("padding")
 			continue
 		}
 		r.UnreadByte()
 
 		var frame frames.Frame
-		if typeByte&0x80 == 0x80 {
+		if (u.version <= protocol.Version39 && typeByte&0x80 == 0x80) || (u.version > protocol.Version39 && typeByte&0xc0 == 0xc0) {
 			frame, err = frames.ParseStreamFrame(r, u.version)
 			if err != nil {
 				err = qerr.Error(qerr.InvalidStreamData, err.Error())
@@ -59,7 +61,7 @@ func (u *packetUnpacker) Unpack(publicHeaderBinary []byte, hdr *PublicHeader, da
 					err = qerr.Error(qerr.UnencryptedStreamData, fmt.Sprintf("received unencrypted stream data on stream %d", streamID))
 				}
 			}
-		} else if typeByte&0xc0 == 0x40 {
+		} else if (u.version <= protocol.Version39 && typeByte&0xc0 == 0x40) || (u.version > protocol.Version39 && typeByte&0xa0 == 0xa0) {
 			frame, err = frames.ParseAckFrame(r, u.version)
 			if err != nil {
 				err = qerr.Error(qerr.InvalidAckData, err.Error())

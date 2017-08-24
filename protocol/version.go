@@ -10,6 +10,7 @@ const (
 	Version37
 	Version38
 	Version39
+	Version40
 	VersionWhatever    VersionNumber = 0 // for when the version doesn't matter
 	VersionUnsupported VersionNumber = -1
 	VersionUnknown     VersionNumber = -2
@@ -18,6 +19,7 @@ const (
 // SupportedVersions lists the versions that the server supports
 // must be in sorted descending order
 var SupportedVersions = []VersionNumber{
+	Version40,
 	Version39,
 	Version38,
 	Version37,
