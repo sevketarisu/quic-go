@@ -7,8 +7,5 @@ func NewNullAEAD(p protocol.Perspective, v protocol.VersionNumber) AEAD {
 	if v == protocol.VersionTLS {
 		return &nullAEADFNV64a{}
 	}
-	return &nullAEADFNV128a{
-		perspective: p,
-		version:     v,
-	}
+	return &nullAEADFNV128a{perspective: p}
 }
