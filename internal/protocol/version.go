@@ -5,8 +5,7 @@ type VersionNumber int
 
 // The version numbers, making grepping easier
 const (
-	Version35 VersionNumber = 35 + iota
-	Version36
+	Version36 VersionNumber = 36 + iota
 	Version37
 	Version38
 	Version39
@@ -23,7 +22,6 @@ var SupportedVersions = []VersionNumber{
 	Version38,
 	Version37,
 	Version36,
-	Version35,
 }
 
 // VersionNumberToTag maps version numbers ('32') to tags ('Q032')
