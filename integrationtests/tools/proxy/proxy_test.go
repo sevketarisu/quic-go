@@ -22,7 +22,7 @@ var _ = Describe("QUIC Proxy", func() {
 		b := &bytes.Buffer{}
 		hdr := wire.PublicHeader{
 			PacketNumber:         p,
-			PacketNumberLen:      protocol.PacketNumberLen6,
+			PacketNumberLen:      protocol.PacketNumberLen1,
 			ConnectionID:         1337,
 			TruncateConnectionID: false,
 		}
@@ -104,7 +104,7 @@ var _ = Describe("QUIC Proxy", func() {
 		}
 
 		BeforeEach(func() {
-			serverReceivedPackets = make(chan packetData, 100)
+			serverReceivedPackets = make(chan packetData, 1000)
 			atomic.StoreInt32(&serverNumPacketsSent, 0)
 
 			// setup a dump UDP server
@@ -207,6 +207,39 @@ var _ = Describe("QUIC Proxy", func() {
 				Eventually(clientReceivedPackets).Should(HaveLen(2))
 				Expect(string(<-clientReceivedPackets)).To(ContainSubstring("foobar"))
 				Expect(string(<-clientReceivedPackets)).To(ContainSubstring("decafbad"))
+			})
+
+			It("infers packet numbers", func() {
+				num := 600
+				inferedPacketNumberIncoming := make(chan protocol.PacketNumber, num)
+				inferedPacketNumberOutgoing := make(chan protocol.PacketNumber, num)
+
+				opts := Opts{
+					RemoteAddr: serverConn.LocalAddr().String(),
+					// don't drop anything, but pass the packet number to the channels
+					DropPacket: func(d Direction, p protocol.PacketNumber) bool {
+						if d == DirectionIncoming {
+							inferedPacketNumberIncoming <- p
+						} else {
+							inferedPacketNumberOutgoing <- p
+						}
+						return false
+					},
+				}
+				startProxy(opts)
+
+				// send num packets
+				for i := 1; i <= num; i++ {
+					_, err := clientConn.Write(makePacket(protocol.PacketNumber(i), []byte("foobar"+strconv.Itoa(i))))
+					Expect(err).ToNot(HaveOccurred())
+				}
+				// check that all packet numbers were derived correctly
+				for i := 1; i <= num; i++ {
+					Eventually(inferedPacketNumberIncoming).Should(Receive(Equal(protocol.PacketNumber(i))))
+					Eventually(inferedPacketNumberOutgoing).Should(Receive(Equal(protocol.PacketNumber(i))))
+				}
+				Consistently(inferedPacketNumberIncoming).ShouldNot(Receive())
+				Consistently(inferedPacketNumberOutgoing).ShouldNot(Receive())
 			})
 		})
 

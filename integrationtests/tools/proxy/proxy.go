@@ -67,6 +67,9 @@ type QuicProxy struct {
 	conn       *net.UDPConn
 	serverAddr *net.UDPAddr
 
+	lastIncomingPacket protocol.PacketNumber
+	lastOutgoingPacket protocol.PacketNumber
+
 	dropPacket  DropCallback
 	delayPacket DelayCallback
 
@@ -162,20 +165,21 @@ func (p *QuicProxy) runProxy() error {
 		}
 		p.mutex.Unlock()
 
-		atomic.AddUint64(&conn.incomingPacketCounter, 1)
-
-		r := bytes.NewReader(raw)
-		hdr, err := wire.ParsePublicHeader(r, protocol.PerspectiveClient, p.version)
+		hdr, err := wire.ParsePublicHeader(bytes.NewReader(raw), protocol.PerspectiveClient, p.version)
 		if err != nil {
 			return err
 		}
 
-		if p.dropPacket(DirectionIncoming, hdr.PacketNumber) {
+		atomic.AddUint64(&conn.incomingPacketCounter, 1)
+		packetNumber := protocol.InferPacketNumber(hdr.PacketNumberLen, p.lastIncomingPacket, hdr.PacketNumber)
+		p.lastIncomingPacket = packetNumber
+
+		if p.dropPacket(DirectionIncoming, packetNumber) {
 			continue
 		}
 
 		// Send the packet to the server
-		delay := p.delayPacket(DirectionIncoming, hdr.PacketNumber)
+		delay := p.delayPacket(DirectionIncoming, packetNumber)
 		if delay != 0 {
 			time.AfterFunc(delay, func() {
 				// TODO: handle error
@@ -200,19 +204,20 @@ func (p *QuicProxy) runConnection(conn *connection) error {
 		}
 		raw := buffer[0:n]
 
-		r := bytes.NewReader(raw)
-		hdr, err := wire.ParsePublicHeader(r, protocol.PerspectiveServer, p.version)
+		hdr, err := wire.ParsePublicHeader(bytes.NewReader(raw), protocol.PerspectiveServer, p.version)
 		if err != nil {
 			return err
 		}
 
 		atomic.AddUint64(&conn.outgoingPacketCounter, 1)
+		packetNumber := protocol.InferPacketNumber(hdr.PacketNumberLen, p.lastOutgoingPacket, hdr.PacketNumber)
+		p.lastOutgoingPacket = packetNumber
 
-		if p.dropPacket(DirectionOutgoing, hdr.PacketNumber) {
+		if p.dropPacket(DirectionOutgoing, packetNumber) {
 			continue
 		}
 
-		delay := p.delayPacket(DirectionOutgoing, hdr.PacketNumber)
+		delay := p.delayPacket(DirectionOutgoing, packetNumber)
 		if delay != 0 {
 			time.AfterFunc(delay, func() {
 				// TODO: handle error
