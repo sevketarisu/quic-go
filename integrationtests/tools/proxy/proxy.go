@@ -200,21 +200,19 @@ func (p *QuicProxy) runConnection(conn *connection) error {
 		}
 		raw := buffer[0:n]
 
-		// TODO: Switch back to using the public header once Chrome properly sets the type byte.
-		// r := bytes.NewReader(raw)
-		// , err := wire.ParsePublicHeader(r, protocol.PerspectiveServer)
-		// if err != nil {
-		// return err
-		// }
+		r := bytes.NewReader(raw)
+		hdr, err := wire.ParsePublicHeader(r, protocol.PerspectiveServer, p.version)
+		if err != nil {
+			return err
+		}
 
-		v := atomic.AddUint64(&conn.outgoingPacketCounter, 1)
+		atomic.AddUint64(&conn.outgoingPacketCounter, 1)
 
-		packetNumber := protocol.PacketNumber(v)
-		if p.dropPacket(DirectionOutgoing, packetNumber) {
+		if p.dropPacket(DirectionOutgoing, hdr.PacketNumber) {
 			continue
 		}
 
-		delay := p.delayPacket(DirectionOutgoing, packetNumber)
+		delay := p.delayPacket(DirectionOutgoing, hdr.PacketNumber)
 		if delay != 0 {
 			time.AfterFunc(delay, func() {
 				// TODO: handle error
