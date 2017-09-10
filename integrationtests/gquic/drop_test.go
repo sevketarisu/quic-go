@@ -82,13 +82,25 @@ func dropTests(
 
 		It("gets a file when many outgoing packets are dropped", func() {
 			runDropTest(func(d quicproxy.Direction, p protocol.PacketNumber) bool {
-				return d == quicproxy.DirectionOutgoing && dropper(p)
+				drop := d == quicproxy.DirectionOutgoing && dropper(p)
+				if drop {
+					utils.Debugf("Dropping packet %d, direction %d", p, d)
+				} else {
+					utils.Debugf("Not dropping packet %d, direction %d", p, d)
+				}
+				return drop
 			}, version)
 		})
 
 		It("gets a file when many incoming packets are dropped", func() {
 			runDropTest(func(d quicproxy.Direction, p protocol.PacketNumber) bool {
-				return d == quicproxy.DirectionIncoming && dropper(p)
+				drop := d == quicproxy.DirectionIncoming && dropper(p)
+				if drop {
+					utils.Debugf("Dropping packet %d, direction %d", p, d)
+				} else {
+					utils.Debugf("Not dropping packet %d, direction %d", p, d)
+				}
+				return drop
 			}, version)
 		})
 	})
